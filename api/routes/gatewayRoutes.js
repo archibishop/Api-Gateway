@@ -17,8 +17,14 @@ router.post('/api-gateway/v1/users/login', GatewayController.loginUser);
 
 router.get('/api-gateway/v1/users', GatewayController.getUsers);
 
-router.get('/api-gateway/v1/users/activate/:id', GatewayController.activateUserAccount)
+router.get('/api-gateway/v1/users/activate/:id', GatewayController.activateUserAccount);
 
-router.post('/api-gateway/v1/users/reset-password', GatewayController.resetPassword)
+router.post('/api-gateway/v1/users/reset-password', GatewayController.resetPassword);
+
+router.get('/api-gateway/v1/users/meals', isAuthorized, GatewayController.getMeals);
+
+router.post('/api-gateway/v1/users/meals', isAuthorized, GatewayController.addMeal);
+
+router.delete('/api-gateway/v1/users/meals/:id', isAuthorized, GatewayController.deleteMeal);
 
 export default router;
