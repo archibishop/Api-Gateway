@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const middleWareObj = (authPort) => {
+const middleWareObj = (authIp, authPort) => {
   const unAuthenticatedRoutes = ['/api/v1/users/login', '/api/v1/users', '/api/v1/users/secure'];
 
   const authenticationMiddleWare = async (req, res, next) => {
@@ -14,7 +14,7 @@ const middleWareObj = (authPort) => {
       };
       try {
         if (token && refreshToken) {
-          await axios.get(`http://0.0.0.0:${authPort}/api/v1/users/secure`, { headers });
+          await axios.get(`http://${authIp}:${authPort}/api/v1/users/secure`, { headers });
           next();
         } else {
           res.send({
@@ -26,7 +26,7 @@ const middleWareObj = (authPort) => {
         const { data, status } = err.response;
         if (data.message === 'jwt expired') {
           try {
-            await axios.post(`http://0.0.0.0:${authPort}/api/v1/users/refresh-token`, { refreshToken });
+            await axios.post(`http://${authIp}:${authPort}/api/v1/users/refresh-token`, { refreshToken });
             // TODO ::
             // Use web sockets to send a push to the front-end.
             // Proceed with the request since a new token has been generated and sent to front-end.

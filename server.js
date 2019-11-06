@@ -8,7 +8,7 @@ import middlewareObj from './api/middleware/isAuthroized';
 // Server
 const app = express();
 
-const docker = new Docker();
+const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 const mediator = new EventEmitter();
 
 
@@ -17,17 +17,21 @@ const containerMetaData = [];
 const PORT = process.env.Port || 3001;
 
 let authPort = '';
+let authIp = '';
 
 docker.listContainers((err, containers) => {
   containers.forEach((containerInfo) => {
     if (containerInfo.Names[0] === '/auth-service' || containerInfo.Names[0] === '/meal-service') {
-      console.log(containerInfo.Ports[0].PublicPort);
+      console.log(containerInfo.Ports[0]);
       const metaContainer = {
         route: containerInfo.Labels.apiRoute,
-        port: containerInfo.Ports[0].PublicPort,
+        publicPort: containerInfo.Ports[0].PublicPort,
+        privatePort: containerInfo.Ports[0].PrivatePort,
+        ipAddress: containerInfo.NetworkSettings.Networks['auth-service_default'].IPAddress,
       };
       if (containerInfo.Labels.apiRoute.includes('users')) {
-        authPort = containerInfo.Ports[0].PublicPort;
+        authPort = containerInfo.Ports[0].PrivatePort;
+        authIp = containerInfo.NetworkSettings.Networks['auth-service_default'].IPAddress;
       }
       containerMetaData.push(metaContainer);
     }
@@ -36,10 +40,10 @@ docker.listContainers((err, containers) => {
 });
 
 mediator.on('onComplete', () => {
-  const authMiddleware = middlewareObj(authPort);
+  const authMiddleware = middlewareObj(authIp, authPort);
   containerMetaData.forEach((value) => {
-    const { route, port } = value;
-    const target = `http://0.0.0.0:${port}`;
+    const { route, ipAddress, privatePort } = value;
+    const target = `http://${ipAddress}:${privatePort}`;
     app.use(
       route,
       authMiddleware.authenticationMiddleWare,
