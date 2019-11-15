@@ -5,6 +5,8 @@ services:
     build:
       context: .
     container_name: api-gateway
+    image: gcr.io/summer-hawk-258307/app
+    # image: wagubib/microservice:apigateway
     volumes:
       - .:/usr/src/app
       - /var/run/docker.sock:/var/run/docker.sock

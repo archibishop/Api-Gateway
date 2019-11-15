@@ -1,16 +1,21 @@
 /* eslint-disable no-console */
 import express from 'express';
-import Docker from 'dockerode';
 import { EventEmitter } from 'events';
 import proxy from 'http-proxy-middleware';
-import middlewareObj from './api/middleware/isAuthroized';
+import middlewareObj from './middleware/isAuthroized';
+
+const k8s = require('@kubernetes/client-node');
 
 // Server
 const app = express();
 
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 const mediator = new EventEmitter();
 
+// Kubernetes
+const kc = new k8s.KubeConfig();
+kc.loadFromDefault();
+
+const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 
 const containerMetaData = [];
 // Port
@@ -19,31 +24,38 @@ const PORT = process.env.Port || 3001;
 let authPort = '';
 let authIp = '';
 
-docker.listContainers((err, containers) => {
-  containers.forEach((containerInfo) => {
-    if (containerInfo.Names[0] === '/auth-service' || containerInfo.Names[0] === '/meal-service') {
-      console.log(containerInfo.Ports[0]);
-      const metaContainer = {
-        route: containerInfo.Labels.apiRoute,
-        publicPort: containerInfo.Ports[0].PublicPort,
-        privatePort: containerInfo.Ports[0].PrivatePort,
-        ipAddress: containerInfo.NetworkSettings.Networks['auth-service_default'].IPAddress,
-      };
-      if (containerInfo.Labels.apiRoute.includes('users')) {
-        authPort = containerInfo.Ports[0].PrivatePort;
-        authIp = containerInfo.NetworkSettings.Networks['auth-service_default'].IPAddress;
+k8sApi.listNamespacedService('default').then((res) => {
+  res.body.items.forEach((item) => {
+    console.log('All default namespaced services');
+    // Service Information
+    if (item.metadata.annotations) {
+      console.log('Here inside Annotations');
+      if (item.metadata.annotations.apiRoute) {
+        const metaContainer = {
+          route: item.metadata.annotations.apiRoute,
+          publicPort: item.spec.ports[0].port,
+          privatePort: item.spec.ports[0].targetPort,
+          ipAddress: item.spec.clusterIP,
+        };
+        if (item.metadata.annotations.apiRoute.includes('users')) {
+          authPort = item.spec.ports[0].port;
+          authIp = item.spec.clusterIP;
+        }
+        containerMetaData.push(metaContainer);
       }
-      containerMetaData.push(metaContainer);
     }
   });
+  mediator.emit('onComplete');
+}).catch((err) => {
+  console.log('An error has occurred', err);
   mediator.emit('onComplete');
 });
 
 mediator.on('onComplete', () => {
   const authMiddleware = middlewareObj(authIp, authPort);
   containerMetaData.forEach((value) => {
-    const { route, ipAddress, privatePort } = value;
-    const target = `http://${ipAddress}:${privatePort}`;
+    const { route, ipAddress, publicPort } = value;
+    const target = `http://${ipAddress}:${publicPort}`;
     app.use(
       route,
       authMiddleware.authenticationMiddleWare,
