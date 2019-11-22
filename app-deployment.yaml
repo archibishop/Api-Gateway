@@ -22,9 +22,10 @@ spec:
         io.kompose.service: app
     spec:
       containers:
-      # - image: gcr.io/summer-hawk-258307/app
-      - image: wagubib/microservice:apigateway
+      - image: gcr.io/summer-hawk-258307/app
+      # - image: wagubib/microservice:apigateway
         name: api-gateway
+        imagePullPolicy: "Always"
         ports:
         - containerPort: 3001
         resources: {}
